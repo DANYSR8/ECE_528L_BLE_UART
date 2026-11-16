@@ -28,6 +28,15 @@
 #ifndef INC_BLE_UART_H_
 #define INC_BLE_UART_H_
 
+#define BLE_UART_BUFFER_SIZE 128
+#define CR 0x0D
+#define LF 0x0A
+#define BS 0x08
+#define ESC 0x1B
+#define SP 0x20
+#define DEL 0x7F
+
+
 #include <stdint.h>
 #include <string.h>
 #include "msp.h"
