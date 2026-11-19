@@ -148,6 +148,35 @@ int BLE_UART_InString(char *buffer_pointer, uint16_t buffer_size)
 
 
 
+// -------------------- Part 6.2 -----------------------------
+
+void BLE_UART_InString(char *buffer_pointer, uint16_t buffer_size)
+{
+
+    char character = BLE_UART_InChar();
+
+    if (character == '!') 
+    {
+        *buffer_pointer = character;                 //stores the header value 
+        buffer_pointer++;                            // shifts one over
+        
+        for (uint8_t i = 0; i < 4 ; i++)
+            {
+                *buffer_pointer = BLE_UART_InChar();  // places value into 'buffer pointer 
+                 buffer_pointer++;                    // shifts address in buffer to the next
+            }
+        
+        
+
+    }
+
+
+}
+
+// ----------------------------------------------------------
+
+
+
 
 
 //Sends a null-terminated string to the BLE module one character at a time.
