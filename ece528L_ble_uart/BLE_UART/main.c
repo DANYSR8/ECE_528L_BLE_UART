@@ -29,7 +29,7 @@
 
 #define PWM_NOMINAL 3000
 
-
+// --------------Part 6.1A ----------------
 void TX_Msg_A(void)
 {
 
@@ -43,6 +43,44 @@ void TX_Msg_A(void)
     Clock_Delay1ms(10);
 
 }
+
+// -------------------------------------
+
+
+
+
+// --------------Part 6.1B ----------------
+void TX_Msg_B(void)
+{
+
+switch (Get_PMOD_SWT_Status())
+
+    case: 0x01
+        BLE_UART_OutChar(0xAA);
+        break;
+
+    case:0x02
+        BLE_UART_OutChar(0x10);
+        break;
+
+    case:0x04
+        BLE_UART_OutChar(0xF0);
+        break;
+
+    case:0x08
+        BLE_UART_OutChar(0x0F);
+        break;
+    
+    default:
+        BLE_UART_OutChar(0x00);
+        break;
+
+}
+// -------------------------------------
+
+
+
+
 
 
 void Process_BLE_UART_Data(char BLE_UART_Buffer[])
@@ -59,12 +97,28 @@ void Process_BLE_UART_Data(char BLE_UART_Buffer[])
             LED2_Output(RGB_LED_OFF);
 
         }
-    else if(Check_BLE_UART_Data(BLE_UART_Buffer,"DANY"))
-    {
-            TX_Msg_A();
-            printf("Sending TX Msg A \n");
-    }
 
+        
+    // ---------------Part 6.1A -------------------------------------
+    else if(Check_BLE_UART_Data(BLE_UART_Buffer,"DANY"))
+        {
+                TX_Msg_A();
+                printf("Sending TX Msg A \n");
+        }
+    // --------------------------------------------------------------
+
+   
+        
+    // ---------------Part 6.1B -------------------------------------
+    else if(Check_BLE_UART_Data(BLE_UART_Buffer,"SILVA"))
+        {
+                TX_Msg_B();
+                printf("Sending TX Msg B \n");
+        }
+
+    // -------------------------------------------------------------
+
+        
     else
         {
 
@@ -89,6 +143,11 @@ int main(void)
     EUSCI_A0_UART_Init_Printf();
     BLE_UART_Init();
     Motor_Init();
+
+    // ----- Added for Task 6.1 Part B -----
+    PMOD_SWT_Init(); 
+    // ------------------------------------
+    
 
     char BLE_UART_Buffer[BLE_UART_BUFFER_SIZE] = {0};
 
