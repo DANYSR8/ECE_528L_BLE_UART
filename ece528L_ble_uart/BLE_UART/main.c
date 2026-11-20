@@ -19,6 +19,7 @@
 #include "msp.h"
 #include <stdint.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "inc/Clock.h"
 #include "inc/CortexM.h"
@@ -26,6 +27,7 @@
 #include "inc/EUSCI_A0_UART.h"
 #include "inc/Motor.h"
 #include "inc/BLE_UART.h"
+#include "inc/Timer_A0_PWM.h"
 
 #define PWM_NOMINAL 3000
 
@@ -34,13 +36,13 @@ void TX_Msg_A(void)
 {
 
     BLE_UART_OutChar(170);
-    Clock_Delay1ms(10);
+    Clock_Delay1ms(1);
     BLE_UART_OutChar(85);
-    Clock_Delay1ms(10);
+    Clock_Delay1ms(1);
     BLE_UART_OutChar(255);
-    Clock_Delay1ms(10);
+    Clock_Delay1ms(1);
     BLE_UART_OutChar(0);
-    Clock_Delay1ms(10);
+    Clock_Delay1ms(1);
 
 }
 
@@ -53,27 +55,33 @@ void TX_Msg_A(void)
 void TX_Msg_B(void)
 {
 
-switch (Get_PMOD_SWT_Status())
+    switch (Get_PMOD_SWT_Status()){
 
-    case: 0x01
-        BLE_UART_OutChar(0xAA);
-        break;
+        case 0x01:
+            BLE_UART_OutChar(0xAA);
+            printf("SW1\n");
+            break;
 
-    case:0x02
-        BLE_UART_OutChar(0x10);
-        break;
+        case 0x02:
+            BLE_UART_OutChar(0x10);
+            printf("SW2\n");
+            break;
 
-    case:0x04
-        BLE_UART_OutChar(0xF0);
-        break;
-
-    case:0x08
-        BLE_UART_OutChar(0x0F);
-        break;
+        case 0x04:
+            BLE_UART_OutChar(0xF0);
+            printf("SW3\n");
+            break;
     
-    default:
-        BLE_UART_OutChar(0x00);
-        break;
+        case 0x08:
+            BLE_UART_OutChar(0x0F);
+            printf("SW4\n");
+            break;
+
+        default:
+            BLE_UART_OutChar(0x00);
+            printf("Default\n");
+            break;
+    }
 
 }
 // -------------------------------------
@@ -163,6 +171,7 @@ int main(void)
     while(1)
     {
 
+        /*
         int string_size = BLE_UART_InString(BLE_UART_Buffer, BLE_UART_BUFFER_SIZE);
 
         printf("BLE UART Data: ");
@@ -175,6 +184,26 @@ int main(void)
         printf("\n");
 
         Process_BLE_UART_Data(BLE_UART_Buffer);
+        */
+
+
+
+       BLE_UART_InPacket(BLE_UART_Buffer);
+
+        printf("BLE UART Data: ");
+
+        for (int i = 0 ; i < 4; i++)
+        {
+            printf("%c", BLE_UART_Buffer[i]);
+        }
+
+        printf("\n");
+
+
+        Decode_Controller_Packet(BLE_UART_Buffer);
+
+
+
 
 
 

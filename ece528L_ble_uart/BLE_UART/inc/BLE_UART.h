@@ -50,6 +50,10 @@ void BLE_UART_OutChar(uint8_t data);
 
 int BLE_UART_InString(char *buffer_pointer, uint16_t buffer_size);
 
+void BLE_UART_InPacket(char *buffer_pointer);
+
+void Decode_Controller_Packet(char *buffer_pointer);
+
 void BLE_UART_OutString(char *pt);
 
 uint8_t Check_BLE_UART_Data(char BLE_UART_Data_Buffer[], char *data_string);

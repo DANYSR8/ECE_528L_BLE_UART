@@ -25,8 +25,12 @@
  *
  */
 
+#include <stdint.h>
+#include <stdio.h>
 #include "../inc/BLE_UART.h"
+#include "../inc/Motor.h"
 
+#define PWM_NOMINAL 3000
 
 
 /*Initializes eUSCI_A3 in UART mode to talk to the Adafruit Bluefruit LE UART Friend module.
@@ -149,29 +153,83 @@ int BLE_UART_InString(char *buffer_pointer, uint16_t buffer_size)
 
 
 // -------------------- Part 6.2 -----------------------------
-
-void BLE_UART_InString(char *buffer_pointer, uint16_t buffer_size)
+// Discards incoming characters until the '!' header is received, then stores the header and the next 4 bytes
+// (packet type, button number, pressed/released, checksum) in the buffer without waiting for a Line Feed.
+void BLE_UART_InPacket(char *buffer_pointer)
 {
-
-    char character = BLE_UART_InChar();
-
-    if (character == '!') 
+    // Discard incoming characters until the '!' (0x21) packet header is received
+    char character;
+    do
     {
-        *buffer_pointer = character;                 //stores the header value 
-        buffer_pointer++;                            // shifts one over
-        
-        for (uint8_t i = 0; i < 4 ; i++)
-            {
-                *buffer_pointer = BLE_UART_InChar();  // places value into 'buffer pointer 
-                 buffer_pointer++;                    // shifts address in buffer to the next
-            }
-        
-        
+        character = BLE_UART_InChar();
+    } while (character != '!');
 
+    buffer_pointer[0] = character;
+
+    for (int i = 1; i < 5; i++)
+    {
+        buffer_pointer[i] = BLE_UART_InChar();
+    }
+
+}
+
+
+
+
+// Decodes a Bluefruit Connect button packet ("!B") and drives the robot: buttons 5-8 move forward, backward,
+// left, or right while pressed, and any button release stops the motors.
+
+void Decode_Controller_Packet(char *buffer_pointer){
+
+    if (buffer_pointer[0] != 0x21 || buffer_pointer[1] != 0x42)
+    {
+        return;
     }
 
 
-}
+
+    if (buffer_pointer[3] == 0x30 )
+    {
+        printf("Motor Stop \n");
+        Motor_Stop();
+        return;
+    }
+
+            if (buffer_pointer[2] == 0x35)
+                {
+
+                    printf("Motor Fowarded \n");
+                    Motor_Forward(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+                else if (buffer_pointer[2] == 0x36)
+                {
+
+                    printf("Motor Backward \n");
+                    Motor_Backward(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+                else if (buffer_pointer[2] == 0x37)
+                {
+
+                    printf("Motor Left \n");
+                    Motor_Left(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+
+                else if (buffer_pointer[2] == 0x38)
+                {
+
+                    printf("Motor Right \n");
+                    Motor_Right(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+
+            }
 
 // ----------------------------------------------------------
 

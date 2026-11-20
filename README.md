@@ -7,12 +7,14 @@
 
 ### Overview:
 
+This lab focuses on introducing UART commnucation protical, set up wireless communication between the MSP432 robot and the Bluefruit Connect app using the Adafruit Bluefruit LE UART Friend module. Fixed byte sequences and PMOD switch-selected bytes were transmitted over UART, and each was verified by capturing and annotating the waveforms on an oscilloscope. Finally, a packet-based receive function and a decoder were implemented to interpret Control Pad button presses from the app, letting the robot drive forward, backward, left, and right, and stop when a button is released.
+
 ### Components Used:
-The Bluetooth Low Energy (BLE) lab interfaces with the following:
+
 * User LEDs of the TI MSP432 LaunchPad
 * Pololu Gearmotor with Encoder - [Product Link](https://www.pololu.com/product/3675)
 * Adafruit Bluefruit LE UART Friend - Bluetooth Low Energy (BLE) Module - [Product Link](https://www.adafruit.com/product/2479)
-
+* PMOD SWT (4 Slide Switches) - [Product Link](https://digilent.com/reference/pmod/pmodswt/start)
 
 
 ### Analysis and Results: 
@@ -403,7 +405,7 @@ With the completed `main.c`, the first task was to implement two ways of transmi
 
 ![PartA_Image](./Images/LabTask1_PartA.png)
 
-Our implementation sends the bytes only once, and they are only sent when a specified value is sent to the module; in this case, it's `DANY`, as shown in our implementation code below. We implemented this by creating a `TX_Msg_A` function that contains the 4 bytes we want to send, modifying `Process_BLE_UART_Data` to have an additional `else if`, and using the same `main` function that was initially set up during the prelab section of this lab. The results for this part of the lab can be seen in the Results section in the corresponding subsection.
+Our implementation sends the bytes only once, and they are only sent when a specified value is sent to the module; in this case, it's `DANY`, as shown in our implementation code below. We implemented this by creating a `TX_Msg_A` function that contains the 4 bytes we want to send, modifying `Process_BLE_UART_Data` to have an additional `else if`, and using the same `main` function that was initially set up during the prelab section of this lab. A 10 ms delay was added between each byte transmission. The results for this part of the lab can be seen in the Results section in the corresponding subsection.
 
 ```c
 void TX_Msg_A(void)
@@ -454,26 +456,299 @@ void Process_BLE_UART_Data(char BLE_UART_Buffer[])
 
 ###### ***Part B***
 
-Part B, "UART Transmission Using PMOD SWT," on the other hand, uses the PMOD switches to continuously send one type of message based on the switch configuration of the PMOD, which is summarized in the table below.
+Part B, "UART Transmission Using PMOD SWT," on the other hand, uses the PMOD switches to send one type of message based on the switch configuration of the PMOD, which is summarized in the table below.
 
 ![PartBImage](./Images/LabTask1_PartB.png)
 
-We implemented this using ...........
+We implemented this by using the `Get_PMOD_SWT_Status()` from the GPIO source file, where we followed the pin configuration laid out in the comments in the GPIO source file. In order to use this, we needed to add `PMOD_SWT_Init()` in the `main` function along with the other initialization function calls.
+
+```c
+int main(void)
+{
+
+    DisableInterrupts();
+    Clock_Init48MHz();
+    LED2_Init();
+    EUSCI_A0_UART_Init_Printf();
+    BLE_UART_Init();
+    Motor_Init();
+
+    // ----- Added for Task 6.1 Part B -----
+    PMOD_SWT_Init(); 
+    // ------------------------------------
+    
+
+    char BLE_UART_Buffer[BLE_UART_BUFFER_SIZE] = {0};
+
+    EnableInterrupts();
+
+    Clock_Delay1ms(1000);
+    BLE_UART_Reset();
+
+    BLE_UART_OutString("BLE UART Active\r \n");
+    Clock_Delay1ms(1000);
+
+
+    while(1)
+    {
+
+    
+        int string_size = BLE_UART_InString(BLE_UART_Buffer, BLE_UART_BUFFER_SIZE);
+
+        printf("BLE UART Data: ");
+
+        for (int i = 0 ; i < string_size; i++)
+        {
+            printf("%c", BLE_UART_Buffer[i]);
+        }
+
+        printf("\n");
+
+        Process_BLE_UART_Data(BLE_UART_Buffer);
+        
+    }
+}
+```
+
+From here, we created a new `TX_Msg_B` function placed before the `main` function, where it uses a switch case that calls `Get_PMOD_SWT_Status()` to read the current switch state, where it then decides what transmitted message will be sent.
+
+```c
+// --------------Part 6.1B ----------------
+void TX_Msg_B(void)
+{
+
+    switch (Get_PMOD_SWT_Status()){
+
+        case 0x01:
+            BLE_UART_OutChar(0xAA);
+            printf("SW1\n");
+            break;
+
+        case 0x02:
+            BLE_UART_OutChar(0x10);
+            printf("SW2\n");
+            break;
+
+        case 0x04:
+            BLE_UART_OutChar(0xF0);
+            printf("SW3\n");
+            break;
+    
+        case 0x08:
+            BLE_UART_OutChar(0x0F);
+            printf("SW4\n");
+            break;
+
+        default:
+            BLE_UART_OutChar(0x00);
+            printf("Default\n");
+            break;
+    }
+
+}
+// -------------------------------------
+
+```
+
+We then go to update `Process_BLE_UART_Data()` to have an additional `else if` that looks for the message `SILVA` so that `TX_Msg_B` can be called and send out its appropriate UART message. Each time `SILVA` is received, a single byte is sent based on the current switch state.
+
+```c
+void Process_BLE_UART_Data(char BLE_UART_Buffer[])
+{
+
+    if(Check_BLE_UART_Data(BLE_UART_Buffer, "RGB LED GREEN"))
+        {
+            LED2_Output(RGB_LED_GREEN);
+
+        }
+    else if (Check_BLE_UART_Data(BLE_UART_Buffer,"RGB LED OFF"))
+        {
+
+            LED2_Output(RGB_LED_OFF);
+
+        }
+
+        
+    // ---------------Part 6.1A -------------------------------------
+    else if(Check_BLE_UART_Data(BLE_UART_Buffer,"DANY"))
+        {
+                TX_Msg_A();
+                printf("Sending TX Msg A \n");
+        }
+    // --------------------------------------------------------------
+
+   
+        
+    // ---------------Part 6.1B -------------------------------------
+    else if(Check_BLE_UART_Data(BLE_UART_Buffer,"SILVA"))
+        {
+                TX_Msg_B();
+                printf("Sending TX Msg B \n");
+        }
+
+    // -------------------------------------------------------------
+
+        
+    else
+        {
+
+        printf("BLE UART Command Not Found \n");
+
+        }
+
+}
+
+```
+The results for this part of the lab can be seen in the Results section in the corresponding subsection.
 
 ---
 
 ##### **Task 2**
 
-The last task of this lab is to implement/modify the `BLE_UART_InString` function to be able to decode button presses from the Bluefruit Connect application and control the MSP432 robot following the functionality described in the summary table below.
+The last task of this lab is to create a `BLE_UART_InPacket` function to be able to decode button presses from the Bluefruit Connect application and control the MSP432 robot following the functionality described in the summary table below.
 
 ![PartBImage](./Images/LabTask2.png)
 
-We implemented a function called `Decode_Controller_Packet` that takes in the saved buffer from `BLE_UART_InString` and follows the design criteria:
+We implemented a function called `Decode_Controller_Packet` that takes in the saved buffer from `BLE_UART_InPacket` and follows the design criteria:
 
 - Discard incoming characters until it receives the `!` header (`0x21`).
 - Store the `!` header and the next four bytes in the `BLE_UART_Buffer` array and return without waiting for a Line Feed character.
 
-We also added `printf` to display what actions are being performed.
+The `BLE_UART_InPacket` was created with a `do-while` loop that keeps placing incoming characters into a variable named `character` until it detects a `!`, where it then saves that current character into the buffer and iterates through the next 4 characters and saves them into the buffer as well. The function below shows this process.
+
+```c
+void BLE_UART_InPacket(char *buffer_pointer)
+{
+    // Discard incoming characters until the '!' (0x21) packet header is received
+    char character;
+    do
+    {
+        character = BLE_UART_InChar();
+    } while (character != '!');
+
+    buffer_pointer[0] = character;
+
+    for (int i = 1; i < 5; i++)
+    {
+        buffer_pointer[i] = BLE_UART_InChar();
+    }
+
+}
+
+```
+
+With this new function being able to receive new packets without waiting for a line return character like the previous task, we need to set up the `Decode_Controller_Packet` that can read in the packet in the buffer and determine the logic of what button was pressed and what action the motor should take. We did this by checking to see if the packet is a valid button packet by ensuring the first 2 characters of the packet are the values '!' and 'B'. With this being valid, the function then goes to check to see if the packet is a pressed '1' or released '0' packet by checking the fourth byte (index 3) of the buffer. If it was a release, it then stops the motors and returns from the function. If it was pressed, it then continues into the function to decode the rest of the packet to determine what action the motor should take; we can see this process in the function below. We also added `printf` to display what actions are being performed and to help with debugging.
+
+```c
+void Decode_Controller_Packet(char *buffer_pointer){
+
+    if (buffer_pointer[0] != 0x21 || buffer_pointer[1] != 0x42)
+    {
+        return;
+    }
+
+
+
+    if (buffer_pointer[3] == 0x30 )
+    {
+        printf("Motor Stop \n");
+        Motor_Stop();
+        return;
+    }
+
+            if (buffer_pointer[2] == 0x35)
+                {
+
+                    printf("Motor Fowarded \n");
+                    Motor_Forward(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+                else if (buffer_pointer[2] == 0x36)
+                {
+
+                    printf("Motor Backward \n");
+                    Motor_Backward(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+                else if (buffer_pointer[2] == 0x37)
+                {
+
+                    printf("Motor Left \n");
+                    Motor_Left(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+
+                else if (buffer_pointer[2] == 0x38)
+                {
+
+                    printf("Motor Right \n");
+                    Motor_Right(PWM_NOMINAL, PWM_NOMINAL);
+
+                }
+
+
+            }
+
+// ----------------------------------------------------------
+
+```
+
+With this, all that was left was to implement the new `BLE_UART_InPacket` and `Decode_Controller_Packet` into the `main loop`, as shown below:
+
+
+```c
+int main(void)
+{
+
+    DisableInterrupts();
+    Clock_Init48MHz();
+    LED2_Init();
+    EUSCI_A0_UART_Init_Printf();
+    BLE_UART_Init();
+    Motor_Init();
+
+    // ----- Added for Task 6.1 Part B -----
+    PMOD_SWT_Init(); 
+    // ------------------------------------
+    
+
+    char BLE_UART_Buffer[BLE_UART_BUFFER_SIZE] = {0};
+
+    EnableInterrupts();
+
+    Clock_Delay1ms(1000);
+    BLE_UART_Reset();
+
+    BLE_UART_OutString("BLE UART Active\r \n");
+    Clock_Delay1ms(1000);
+
+
+    while(1)
+    {
+
+       BLE_UART_InPacket(BLE_UART_Buffer);
+
+        printf("BLE UART Data: ");
+
+        for (int i = 0 ; i < 4; i++)
+        {
+            printf("%c", BLE_UART_Buffer[i]);
+        }
+
+        printf("\n");
+
+
+        Decode_Controller_Packet(BLE_UART_Buffer);
+
+    }
+}
+
+
+```
+To verify this and have an artifact in the Results section, a picture of the terminal window is provided in the Results section.
 
 ---
 
@@ -484,7 +759,7 @@ We also added `printf` to display what actions are being performed.
 We captured all 4 transmitted messages and verified and annotated each message. The 1st image displays the bit width measured from the oscilloscope.
 
 $$
-\text{Bit Width} = \frac{1}{\text{Baud Rate}} \rightarrow \frac{1}{9600} = 104.1\ \mu s
+\text{Bit Width} = \frac{1}{\text{Baud Rate}} \rightarrow \frac{1}{9600} = 104.2\ \mu s
 $$
 
 The following images after that display the annotated transmitted messages in the order that they were sent and as shown in the summary table for this section. The data is LSB formatted, where D0 is the first to appear, and it ends with D7. The annotations also show the Start Bit called out (i.e., the initial 0 that marks the start) as well as the Stop Bit (i.e., the ending value of 1 marking the end of the data packet).
@@ -502,17 +777,36 @@ The following images after that display the annotated transmitted messages in th
 
 **Task 1 Part B**
 
+We captured the 5 unique states from the summary table and verified and annotated each message. Below are the images of the results.
+
+![PartB_0XAA](./Images/Task1_B%20Results/Lab4Task1A-B_Byte%200xAA.drawio.png)
+
+![PartB_0X10](./Images/Task1_B%20Results/Lab4Task1A-B_Byte%200x10.drawio.png)
+
+![PartB_0XF0](./Images/Task1_B%20Results/Lab4Task1A-B_Byte%200xF0.drawio.png)
+
+![PartB_0X0F](./Images/Task1_B%20Results/Lab4Task1A-B_Byte%200x0F.drawio.png)
+
+![PartB_0X00](./Images/Task1_B%20Results/Lab4Task1A-B_Byte%200x00.drawio.png)
+
 
 
 **Task 2**
 
+As mentioned above, below we are displaying the terminal window of what the robot is receiving when sending commands using the Bluefruit Connect app.
 
-### Known Issues or Limitations: 
+![Task2](./Images/Task%202%20Results/Lab4Task1A-Page-11.drawio.png)
 
+### Known Issues or Limitations:
+
+The original `BLE_UART_InPacket` function used a single `if` statement to check for the `!` header, so whenever the byte it read was not `!`, it returned without writing anything new to the buffer. Because `Decode_Controller_Packet` was still called afterward, it re-read the last valid packet left in the buffer and re-issued the previous movement command instead of processing the button-release packet. Replacing the `if` with a `do-while` loop that discards characters until the `!` header arrives ensured that only complete, new packets were decoded, allowing the release packet to reliably trigger `Motor_Stop()`.
+
+As of right now, during basic testing, there seem to be no issues, but one limitation is that the "numbered" buttons on the Bluefruit Connect App perform no actions, so that might
 
 ### Author Contributions:
 Jamal B. helped with consulting and answering questions that came up during lab time. Code generated individually.
 
+Task 1 Part A Images were capture by Daniel SR. while Task 1B Part B where capture by Jamal B. 
 
 ### References:
 
